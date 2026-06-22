@@ -9,38 +9,123 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedL9RouteImport } from './routes/_authenticated/l9'
+import { Route as AuthenticatedL8RouteImport } from './routes/_authenticated/l8'
+import { Route as AuthenticatedL7RouteImport } from './routes/_authenticated/l7'
+import { Route as AuthenticatedL6RouteImport } from './routes/_authenticated/l6'
+import { Route as AuthenticatedL10RouteImport } from './routes/_authenticated/l10'
 
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedL9Route = AuthenticatedL9RouteImport.update({
+  id: '/l9',
+  path: '/l9',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedL8Route = AuthenticatedL8RouteImport.update({
+  id: '/l8',
+  path: '/l8',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedL7Route = AuthenticatedL7RouteImport.update({
+  id: '/l7',
+  path: '/l7',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedL6Route = AuthenticatedL6RouteImport.update({
+  id: '/l6',
+  path: '/l6',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedL10Route = AuthenticatedL10RouteImport.update({
+  id: '/l10',
+  path: '/l10',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/l10': typeof AuthenticatedL10Route
+  '/l6': typeof AuthenticatedL6Route
+  '/l7': typeof AuthenticatedL7Route
+  '/l8': typeof AuthenticatedL8Route
+  '/l9': typeof AuthenticatedL9Route
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/l10': typeof AuthenticatedL10Route
+  '/l6': typeof AuthenticatedL6Route
+  '/l7': typeof AuthenticatedL7Route
+  '/l8': typeof AuthenticatedL8Route
+  '/l9': typeof AuthenticatedL9Route
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/auth': typeof AuthRoute
+  '/_authenticated/l10': typeof AuthenticatedL10Route
+  '/_authenticated/l6': typeof AuthenticatedL6Route
+  '/_authenticated/l7': typeof AuthenticatedL7Route
+  '/_authenticated/l8': typeof AuthenticatedL8Route
+  '/_authenticated/l9': typeof AuthenticatedL9Route
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/auth' | '/l10' | '/l6' | '/l7' | '/l8' | '/l9'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/auth' | '/l10' | '/l6' | '/l7' | '/l8' | '/l9'
+  id:
+    | '__root__'
+    | '/'
+    | '/_authenticated'
+    | '/auth'
+    | '/_authenticated/l10'
+    | '/_authenticated/l6'
+    | '/_authenticated/l7'
+    | '/_authenticated/l8'
+    | '/_authenticated/l9'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  AuthRoute: typeof AuthRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,11 +133,67 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/l9': {
+      id: '/_authenticated/l9'
+      path: '/l9'
+      fullPath: '/l9'
+      preLoaderRoute: typeof AuthenticatedL9RouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/l8': {
+      id: '/_authenticated/l8'
+      path: '/l8'
+      fullPath: '/l8'
+      preLoaderRoute: typeof AuthenticatedL8RouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/l7': {
+      id: '/_authenticated/l7'
+      path: '/l7'
+      fullPath: '/l7'
+      preLoaderRoute: typeof AuthenticatedL7RouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/l6': {
+      id: '/_authenticated/l6'
+      path: '/l6'
+      fullPath: '/l6'
+      preLoaderRoute: typeof AuthenticatedL6RouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/l10': {
+      id: '/_authenticated/l10'
+      path: '/l10'
+      fullPath: '/l10'
+      preLoaderRoute: typeof AuthenticatedL10RouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedL10Route: typeof AuthenticatedL10Route
+  AuthenticatedL6Route: typeof AuthenticatedL6Route
+  AuthenticatedL7Route: typeof AuthenticatedL7Route
+  AuthenticatedL8Route: typeof AuthenticatedL8Route
+  AuthenticatedL9Route: typeof AuthenticatedL9Route
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedL10Route: AuthenticatedL10Route,
+  AuthenticatedL6Route: AuthenticatedL6Route,
+  AuthenticatedL7Route: AuthenticatedL7Route,
+  AuthenticatedL8Route: AuthenticatedL8Route,
+  AuthenticatedL9Route: AuthenticatedL9Route,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  AuthRoute: AuthRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
