@@ -3,15 +3,17 @@
  *
  * Models the Rust kernel HTTP surface (`/api/kernel/status`, `/api/tasks`,
  * `/api/hypotheses`, `/api/transformations`, `/api/cycle`) but is currently
- * backed by Lovable Cloud (Supabase). When the real Rust backend is deployed,
- * flip `API_MODE` to "rust" and set `API_BASE_URL`; the call sites stay the same.
+ * backed by Lovable Cloud. When the real Rust backend is deployed, flip
+ * `API_MODE` to "rust" and set `VITE_MALEKA_API_URL`; call sites stay the same.
  *
  * Every critical action returns a simulated ProofArtifact (sha-256 over the payload).
  */
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 import { chainHash, signProof, type ProofArtifact } from "@/lib/proof";
 
-const API_MODE: "supabase" | "rust" = "supabase";
+type ApiMode = "supabase" | "rust";
+const API_MODE: ApiMode = "supabase";
 export const API_BASE_URL =
   (import.meta.env.VITE_MALEKA_API_URL as string | undefined) ?? "";
 
@@ -30,17 +32,16 @@ async function logEvent(
   meta: Record<string, unknown> = {},
 ) {
   try {
-    await supabase.from("logs").insert({ level, source, message, meta });
+    await supabase.from("logs").insert({ level, source, message, meta: meta as Json });
   } catch {
     // logs are best-effort
   }
 }
 
-function wrap<T>(promise: PromiseLike<{ data: T | null; error: { message: string } | null }>) {
-  return promise.then(({ data, error }) => {
-    if (error) throw new SentinelError(error.message);
-    return data as T;
-  });
+function unwrap<T>(result: { data: T | null; error: { message: string } | null }): T {
+  if (result.error) throw new SentinelError(result.error.message);
+  if (result.data === null) throw new SentinelError("Empty response from kernel");
+  return result.data;
 }
 
 // ===== KERNEL =====
@@ -49,13 +50,13 @@ export interface KernelStatus {
   sovereignty_index: number;
   uptime_seconds: number;
   last_cycle_at: string | null;
-  mode: typeof API_MODE;
+  mode: ApiMode;
 }
 
 export async function getKernelStatus(): Promise<KernelStatus> {
   const { data: metrics } = await supabase
     .from("metrics")
-    .select("*")
+    .select("cci")
     .order("recorded_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -68,7 +69,7 @@ export async function getKernelStatus(): Promise<KernelStatus> {
     .maybeSingle();
   return {
     identity_verified: true,
-    sovereignty_index: metrics?.cci ?? 0.847,
+    sovereignty_index: Number(metrics?.cci ?? 0.847),
     uptime_seconds: Math.floor(performance.now() / 1000),
     last_cycle_at: lastLog?.created_at ?? null,
     mode: API_MODE,
@@ -89,9 +90,8 @@ export type TaskRow = {
 };
 
 export async function listTasks(): Promise<TaskRow[]> {
-  return wrap(
-    supabase.from("tasks").select("*").order("created_at", { ascending: false }),
-  ) as Promise<TaskRow[]>;
+  const res = await supabase.from("tasks").select("*").order("created_at", { ascending: false });
+  return unwrap(res) as TaskRow[];
 }
 
 export async function createTask(input: {
@@ -102,25 +102,25 @@ export async function createTask(input: {
 }): Promise<TaskRow> {
   const user = (await supabase.auth.getUser()).data.user;
   if (!user) throw new SentinelError("No identity kernel attached", "critical");
-  const row = await wrap(
-    supabase
-      .from("tasks")
-      .insert({
-        title: input.title,
-        description: input.description,
-        priority: input.priority ?? "Medium",
-        federation_node: input.federation_node,
-        owner_id: user.id,
-      })
-      .select()
-      .single(),
-  );
+  const res = await supabase
+    .from("tasks")
+    .insert({
+      title: input.title,
+      description: input.description,
+      priority: input.priority ?? "Medium",
+      federation_node: input.federation_node,
+      owner_id: user.id,
+    })
+    .select()
+    .single();
+  const row = unwrap(res) as TaskRow;
   void logEvent("info", "L6:task", `Task created · ${input.title}`);
-  return row as TaskRow;
+  return row;
 }
 
 export async function updateTaskStatus(id: string, status: TaskRow["status"]): Promise<void> {
-  await wrap(supabase.from("tasks").update({ status }).eq("id", id).select().single());
+  const res = await supabase.from("tasks").update({ status }).eq("id", id);
+  if (res.error) throw new SentinelError(res.error.message);
   void logEvent("info", "L6:task", `Task ${id.slice(0, 8)} → ${status}`);
 }
 
@@ -143,9 +143,8 @@ export type HypothesisRow = {
 };
 
 export async function listHypotheses(): Promise<HypothesisRow[]> {
-  return wrap(
-    supabase.from("hypotheses").select("*").order("created_at", { ascending: false }),
-  ) as Promise<HypothesisRow[]>;
+  const res = await supabase.from("hypotheses").select("*").order("created_at", { ascending: false });
+  return unwrap(res) as HypothesisRow[];
 }
 
 export async function createHypothesis(input: {
@@ -155,32 +154,29 @@ export async function createHypothesis(input: {
 }): Promise<HypothesisRow> {
   const user = (await supabase.auth.getUser()).data.user;
   if (!user) throw new SentinelError("No identity kernel attached", "critical");
-  // novelty derived from statement entropy (simulated)
   const novelty = Math.min(1, Math.max(0.1, new Set(input.statement.toLowerCase()).size / 32));
-  const row = await wrap(
-    supabase
-      .from("hypotheses")
-      .insert({
-        statement: input.statement,
-        context: input.context,
-        parent_id: input.parent_id,
-        novelty_score: Number(novelty.toFixed(4)),
-        owner_id: user.id,
-      })
-      .select()
-      .single(),
-  );
+  const res = await supabase
+    .from("hypotheses")
+    .insert({
+      statement: input.statement,
+      context: input.context,
+      parent_id: input.parent_id,
+      novelty_score: Number(novelty.toFixed(4)),
+      owner_id: user.id,
+    })
+    .select()
+    .single();
+  const row = unwrap(res) as HypothesisRow;
   void logEvent("info", "L7:hypothesis", `Hypothesis filed · novelty ${(novelty * 100).toFixed(1)}%`);
-  return row as HypothesisRow;
+  return row;
 }
 
 export async function validateHypothesis(
   id: string,
   outcome: "Validated" | "Rejected",
 ): Promise<{ row: HypothesisRow; proof: ProofArtifact }> {
-  const row = await wrap(
-    supabase.from("hypotheses").update({ status: outcome }).eq("id", id).select().single(),
-  ) as HypothesisRow;
+  const res = await supabase.from("hypotheses").update({ status: outcome }).eq("id", id).select().single();
+  const row = unwrap(res) as HypothesisRow;
   const proof = await signProof({ id, outcome, ts: Date.now() });
   void logEvent("success", "L7:hypothesis", `Hypothesis ${id.slice(0, 8)} → ${outcome}`, { proof });
   return { row, proof };
@@ -201,12 +197,11 @@ export type TransformationRow = {
 };
 
 export async function listTransformations(): Promise<TransformationRow[]> {
-  return wrap(
-    supabase
-      .from("transformations")
-      .select("*")
-      .order("block_index", { ascending: false }),
-  ) as Promise<TransformationRow[]>;
+  const res = await supabase
+    .from("transformations")
+    .select("*")
+    .order("block_index", { ascending: false });
+  return unwrap(res) as unknown as TransformationRow[];
 }
 
 export async function createTransformation(input: {
@@ -223,23 +218,22 @@ export async function createTransformation(input: {
     .maybeSingle();
   const hash = await chainHash(prev?.hash ?? null, input.payload);
   const proof = await signProof({ ...input.payload, hash });
-  const row = await wrap(
-    supabase
-      .from("transformations")
-      .insert({
-        title: input.title,
-        payload: input.payload,
-        prev_hash: prev?.hash ?? null,
-        hash,
-        proof_artifact: proof.signature,
-        status: "Signed",
-        owner_id: user.id,
-      })
-      .select()
-      .single(),
-  );
-  void logEvent("success", "L8:transform", `RealityBlock #${(row as TransformationRow).block_index} signed`);
-  return row as TransformationRow;
+  const res = await supabase
+    .from("transformations")
+    .insert({
+      title: input.title,
+      payload: input.payload as Json,
+      prev_hash: prev?.hash ?? null,
+      hash,
+      proof_artifact: proof.signature,
+      status: "Signed",
+      owner_id: user.id,
+    })
+    .select()
+    .single();
+  const row = unwrap(res) as unknown as TransformationRow;
+  void logEvent("success", "L8:transform", `RealityBlock #${row.block_index} signed`);
+  return row;
 }
 
 // ===== METRICS (L9) =====
@@ -254,18 +248,13 @@ export type MetricRow = {
 };
 
 export async function listRecentMetrics(limit = 60): Promise<MetricRow[]> {
-  const rows = (await wrap(
-    supabase
-      .from("metrics")
-      .select("*")
-      .order("recorded_at", { ascending: false })
-      .limit(limit),
-  )) as MetricRow[];
+  const res = await supabase
+    .from("metrics")
+    .select("*")
+    .order("recorded_at", { ascending: false })
+    .limit(limit);
+  const rows = unwrap(res) as unknown as MetricRow[];
   return rows.slice().reverse();
-}
-
-export async function recordMetric(input: Omit<MetricRow, "id" | "recorded_at">) {
-  return wrap(supabase.from("metrics").insert(input).select().single());
 }
 
 // ===== LOGS =====
@@ -279,13 +268,12 @@ export type LogRow = {
 };
 
 export async function listRecentLogs(limit = 100): Promise<LogRow[]> {
-  return wrap(
-    supabase
-      .from("logs")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(limit),
-  ) as Promise<LogRow[]>;
+  const res = await supabase
+    .from("logs")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  return unwrap(res) as unknown as LogRow[];
 }
 
 // ===== COGNITIVE CYCLE =====
@@ -300,10 +288,8 @@ export async function runCognitiveCycle(): Promise<CycleResult> {
   const t0 = performance.now();
   void logEvent("info", "kernel:cycle", "Cognitive cycle initiated");
 
-  // simulate kernel work
   await new Promise((r) => setTimeout(r, 1400));
 
-  // synthesize a new metric snapshot from recent activity
   const { data: tasks } = await supabase.from("tasks").select("status");
   const { data: hyps } = await supabase.from("hypotheses").select("status, novelty_score");
 
@@ -320,18 +306,26 @@ export async function runCognitiveCycle(): Promise<CycleResult> {
   const risk_profile = Math.max(0, 0.4 - validated * 0.02 + Math.random() * 0.15);
   const black_swan = Math.max(0, Math.random() * 0.12 + (risk_profile > 0.5 ? 0.1 : 0));
 
-  const metric = (await wrap(
-    supabase
-      .from("metrics")
-      .insert({ cci, stability, risk_profile, black_swan, meta: { source: "cycle" } })
-      .select()
-      .single(),
-  )) as MetricRow;
+  const res = await supabase
+    .from("metrics")
+    .insert({
+      cci,
+      stability,
+      risk_profile,
+      black_swan,
+      meta: { source: "cycle" } as Json,
+    })
+    .select()
+    .single();
+  const metric = unwrap(res) as unknown as MetricRow;
 
   const proof = await signProof({ cci, stability, risk_profile, black_swan });
   const duration_ms = Math.round(performance.now() - t0);
-  void logEvent("success", "kernel:cycle", `Cognitive cycle complete (${duration_ms}ms) · CCI ${cci.toFixed(3)}`, {
-    proof,
-  });
+  void logEvent(
+    "success",
+    "kernel:cycle",
+    `Cognitive cycle complete (${duration_ms}ms) · CCI ${cci.toFixed(3)}`,
+    { proof },
+  );
   return { ok: true, duration_ms, metric, proof };
 }
