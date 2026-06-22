@@ -89,6 +89,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "MALEKA Ω · Supreme Command System" },
+      { name: "description", content: "MALEKA Ω Dashboard: A sophisticated interface for managing AI agents, project progress, and system analytics." },
+      { property: "og:description", content: "MALEKA Ω Dashboard: A sophisticated interface for managing AI agents, project progress, and system analytics." },
+      { name: "twitter:description", content: "MALEKA Ω Dashboard: A sophisticated interface for managing AI agents, project progress, and system analytics." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/32d890f2-31a9-4037-9962-e60a23ebd400/id-preview-14b38dee--7b62a60e-3c6a-4a70-8fb6-34bb9d66723d.lovable.app-1782092586673.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/32d890f2-31a9-4037-9962-e60a23ebd400/id-preview-14b38dee--7b62a60e-3c6a-4a70-8fb6-34bb9d66723d.lovable.app-1782092586673.png" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
